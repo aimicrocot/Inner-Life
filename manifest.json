@@ -1,0 +1,12 @@
+{
+  "display_name": "Inner Life",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "generate_interceptor": "innerLifeInterceptor",
+  "author": "aimicrocot",
+  "version": "0.4.0",
+  "homePage": "https://github.com/aimicrocot/Inner-Life"
+}
