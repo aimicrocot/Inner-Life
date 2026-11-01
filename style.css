@@ -1,0 +1,32 @@
+.inner-life-settings .il-row { margin-top: 6px; }
+.il-root { text-align: left; font-size: 0.95em; }
+.il-title { margin: 0 0 8px; }
+.il-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.il-tab { padding: 4px 10px; }
+.il-tab-active { outline: 2px solid var(--SmartThemeQuoteColor, #888); }
+.il-body { min-height: 200px; }
+.il-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.il-grow { flex: 1 1 160px; min-width: 120px; }
+.il-btn { padding: 4px 10px; width: auto; }
+.il-select { width: auto; max-width: 100%; }
+.il-small { width: 70px; }
+.il-card { border: 1px solid var(--SmartThemeBorderColor, #555); border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--black30a, rgba(0, 0, 0, 0.2)); }
+.il-edit { border-color: var(--SmartThemeQuoteColor, #888); }
+.il-field { margin: 8px 0; display: flex; flex-direction: column; gap: 3px; }
+.il-label { font-weight: 600; }
+.il-check { margin: 4px 0; }
+.il-muted { opacity: 0.7; }
+.il-strong { font-weight: 700; }
+.il-warn { color: var(--SmartThemeUnderlineColor, #e8a33d); }
+.il-ok { color: #6cc070; }
+.il-small-text { font-size: 0.85em; margin-top: 10px; }
+.il-text { white-space: pre-wrap; margin: 6px 0; line-height: 1.4; }
+.il-textarea { width: 100%; min-height: 110px; resize: vertical; }
+.il-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.il-badge { font-size: 0.75em; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--SmartThemeBorderColor, #555); }
+.il-conf-confirmed { border-color: #6cc070; }
+.il-conf-uncertain { border-color: #e8a33d; }
+.il-history { border-left: 3px solid var(--SmartThemeBorderColor, #555); padding-left: 8px; margin: 6px 0; }
+.il-log { max-height: 220px; overflow: auto; font-size: 0.85em; }
+.il-preview { white-space: pre-wrap; font-size: 0.8em; max-height: 220px; overflow: auto; margin: 6px 0; }
+.il-revisit { font-style: italic; opacity: 0.85; margin: 4px 0; border-left: 3px solid var(--SmartThemeQuoteColor, #888); padding-left: 8px; }
