@@ -2,7 +2,7 @@
 // All dynamic text goes through textContent / text nodes, so model output can never inject HTML.
 import { ctx, toast } from './host.js';
 import { collectSecrets, getKey, hasKey, setSessionKey, testProfile } from './llm.js';
-import { deleteGoal, getActiveGoals, userEditGoal, userSetGoalStatus } from './goals.js';
+import { createGoal, deleteGoal, getActiveGoals, userEditGoal, userSetGoalStatus } from './goals.js';
 import { CURRENT_PROFILE_ID, getCharSettings, newProfile, sanitizeSettings } from './settings.js';
 import { deleteUnsaid, heldUnsaid, resolveUnsaid } from './unsaid.js';
 import { CONFIDENCE, MEMORY_TYPES, addMemory, deleteDiaryEntry, deleteMemory, searchDiary, stats, updateDiaryEntry, updateMemory } from './store.js';
@@ -94,7 +94,7 @@ export async function openPanel(app) {
         tab: 'overview',
         diary: { q: '', scope: 'all', order: 'desc', editing: null },
         memory: { q: '', type: '', status: 'active', editing: null, history: new Set(), adding: false },
-        goals: { status: 'active', editing: null, history: new Set(), showResolvedUnsaid: false },
+        goals: { status: 'active', editing: null, adding: false, history: new Set(), showResolvedUnsaid: false },
         models: { editing: null, test: {} },
         preview: '',
         selftest: null,
@@ -321,11 +321,63 @@ export async function openPanel(app) {
         return h('div', {},
             visSel,
             h('div', { class: 'il-row' }, select([['active', 'Активные'], ['paused', 'На паузе'], ['done', 'Достигнутые'], ['dropped', 'Отменённые'], ['all', 'Все']], g.status, v => { g.status = v; render(); })),
-            h('div', { class: 'il-muted' }, `Показано: ${list.length}. Цели ставит и закрывает сам персонаж; ваши действия (пауза, отмена, правка) он менять не может.`),
+            h('div', { class: 'il-row' }, btn(g.adding ? 'Скрыть форму' : '＋ Добавить цель', () => { g.adding = !g.adding; render(); })),
+            g.adding && addGoalForm(cur, data),
+            h('div', { class: 'il-muted' }, `Показано: ${list.length}. Цели ставит и закрывает сам персонаж. Вы можете добавить свою: персонаж примет её и сам решит, как к ней идти. Цели, которые вы поставили на паузу, отменили или отредактировали, он менять не может.`),
             list.length === 0 && h('div', { class: 'il-muted il-card' }, 'Целей нет. Это нормально: персонаж не обязан постоянно к чему-то стремиться.'),
             list.map(x => goalCard(x, data, full, parentOf(x))),
             unsaidSection(data, full),
         );
+    }
+
+    function goalError(reason) {
+        const max = settings().goals.maxActive;
+        return ({
+            'text-too-short': 'Слишком короткая формулировка: нужно хотя бы 8 символов.',
+            'no-completion-criteria': 'Укажите критерий завершения (хотя бы 5 символов).',
+            'too-many-active-goals': `Уже ${max} активных целей. Завершите или отмените одну, либо увеличьте лимит в «Настройки → Цели».`,
+            'too-many-long-goals': 'Уже 3 активные долгосрочные цели. Добавьте это как «шаг» к одной из них или отмените одну из целей.',
+            'duplicate-or-recently-closed': 'Похожая цель уже есть (или была недавно закрыта).',
+            'step-without-active-parent': 'Для шага выберите активную долгосрочную цель.',
+            'too-many-steps': 'У этой цели уже 3 активных шага.',
+        })[reason] || `Не удалось: ${reason}`;
+    }
+
+    /** Shared by "add" and "edit". Reads from element references, never from ids, so it works wherever the panel is mounted. */
+    function goalForm(init, { adding, data }) {
+        const f = { kind: init.kind || 'long', parent: init.parentId || '', priority: init.priority || 3 };
+        const ta = h('textarea', { class: 'text_pole il-textarea', placeholder: 'Чего хочет персонаж, одним предложением', value: init.text || '' });
+        const crit = h('input', { class: 'text_pole', type: 'text', placeholder: adding ? 'Необязательно: персонаж сам решит, когда это достигнуто' : '', value: adding ? '' : (init.criteria || '') });
+        const reason = h('input', { class: 'text_pole', type: 'text', placeholder: 'Необязательно', value: init.reason || '' });
+        const parents = getActiveGoals(data).filter(x => x.kind === 'long');
+        const parentField = field('К какой долгосрочной цели относится', select([['', '— выберите —'], ...parents.map(x => [x.id, x.text.slice(0, 60)])], f.parent, v => { f.parent = v; }));
+        parentField.style.display = f.kind === 'step' ? '' : 'none';
+        const kindField = adding && field('Тип цели', select([['long', 'Долгосрочная'], ['step', 'Шаг к долгосрочной']], f.kind, v => { f.kind = v; parentField.style.display = v === 'step' ? '' : 'none'; }));
+        const node = h('div', {},
+            field('Формулировка', ta),
+            field('Критерий завершения', crit),
+            field('Причина', reason),
+            field('Приоритет (1–5)', select([1, 2, 3, 4, 5].map(n => [String(n), String(n)]), String(f.priority), v => { f.priority = Number(v); })),
+            kindField, adding && parentField);
+        return { node, read: () => ({ text: ta.value, criteria: crit.value, reason: reason.value, priority: f.priority, kind: f.kind, parent: f.parent }) };
+    }
+
+    function addGoalForm(cur, data) {
+        const form = goalForm({}, { adding: true, data });
+        return h('div', { class: 'il-card il-edit' },
+            h('div', { class: 'il-strong' }, 'Новая цель'),
+            form.node,
+            h('div', { class: 'il-row' },
+                btn('Добавить', () => {
+                    const s = settings();
+                    const r = createGoal(data, { ...form.read(), by: 'user', chatId: cur.chatId }, Date.now(), { maxActive: s.goals.maxActive, maxNewPerDay: s.goals.maxNewPerDay, chatId: cur.chatId });
+                    if (r.action !== 'created') return toast('warning', goalError(r.reason)); // the form stays open, nothing is lost
+                    app.saveChar(data);
+                    state.goals.adding = false;
+                    toast('success', 'Цель добавлена.');
+                    render();
+                }),
+                btn('Отмена', () => { state.goals.adding = false; render(); })));
     }
 
     function unsaidSection(data, full) {
@@ -350,13 +402,19 @@ export async function openPanel(app) {
         const g = state.goals;
         const badges = h('div', { class: 'il-badges' },
             h('span', { class: 'il-badge' }, GOAL_KIND_RU[x.kind]), h('span', { class: 'il-badge' }, GOAL_STATUS_RU[x.status]),
-            h('span', { class: 'il-badge' }, `приоритет ${x.priority}`), x.locked && h('span', { class: 'il-badge' }, '🔒 ваше решение'),
+            h('span', { class: 'il-badge' }, `приоритет ${x.priority}`), x.locked && h('span', { class: 'il-badge' }, '🔒 ваше решение'), x.createdBy === 'user' && h('span', { class: 'il-badge' }, 'добавлена вами'),
             h('span', { class: 'il-muted' }, formatDateTime(x.updatedAt)));
         if (g.editing === x.id) {
-            return h('div', { class: 'il-card' }, badges,
-                h('textarea', { class: 'text_pole il-textarea', id: 'il-goal-edit', value: x.text }),
+            const form = goalForm(x, { adding: false, data });
+            return h('div', { class: 'il-card il-edit' }, badges, form.node,
                 h('div', { class: 'il-row' },
-                    btn('Сохранить', () => { userEditGoal(data, x.id, document.getElementById('il-goal-edit').value, Date.now()); app.saveChar(data); g.editing = null; render(); }),
+                    btn('Сохранить', () => {
+                        const v = form.read();
+                        if (v.text.trim().length < 8) return toast('warning', goalError('text-too-short'));
+                        if (v.criteria.trim().length < 5) return toast('warning', goalError('no-completion-criteria'));
+                        if (!userEditGoal(data, x.id, v, Date.now())) return toast('warning', 'Не удалось сохранить правку.');
+                        app.saveChar(data); g.editing = null; toast('success', 'Цель сохранена.'); render();
+                    }),
                     btn('Отмена', () => { g.editing = null; render(); })));
         }
         const open = x.status === 'active' || x.status === 'paused';
