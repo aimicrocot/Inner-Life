@@ -38,11 +38,12 @@ export function findSimilarGoal(data, text, now, { threshold = 0.6 } = {}) {
 
 export function createGoal(data, input, now, limits) {
     const text = String(input?.text ?? '').replace(/\s+/g, ' ').trim();
-    const criteria = String(input?.criteria ?? '').replace(/\s+/g, ' ').trim();
+    const by = input?.by || 'model';
+    // The user may add a goal without spelling out a completion rule: the character then judges it themselves.
+    const criteria = String(input?.criteria ?? '').replace(/\s+/g, ' ').trim() || (by === 'user' ? 'Когда персонаж сам сочтёт это достигнутым' : '');
     if (text.length < 8) return { action: 'skipped', reason: 'text-too-short' };
     if (criteria.length < 5) return { action: 'skipped', reason: 'no-completion-criteria' };
     const kind = GOAL_KINDS.includes(input.kind) ? input.kind : 'long';
-    const by = input.by || 'model';
     const active = getActiveGoals(data);
     if (active.length >= limits.maxActive) return { action: 'skipped', reason: 'too-many-active-goals' };
     if (by === 'model' && limits.maxNewPerDay >= 0) {
@@ -152,7 +153,7 @@ function findSimilarGoalExcluding(data, text, now, excludeId) {
 export function expireStaleGoals(data, now, staleDays) {
     let n = 0;
     for (const g of data.goals) {
-        if (g.status === 'active' && !g.locked && now - g.updatedAt > staleDays * 86400000) {
+        if (g.status === 'active' && !g.locked && g.createdBy !== 'user' && now - g.updatedAt > staleDays * 86400000) {
             close(data, g, 'dropped', now, 'system', `stale: no progress for ${staleDays} days`);
             n++;
         }
@@ -187,12 +188,23 @@ export function userSetGoalStatus(data, id, status, now) {
     return g;
 }
 
-export function userEditGoal(data, id, text, now) {
+/**
+ * patch: a string (new text) or { text, reason, criteria, priority }. Returns the goal, or null when invalid.
+ * Validation happens before anything is changed, so a rejected edit changes nothing.
+ */
+export function userEditGoal(data, id, patch, now) {
     const g = data.goals.find(x => x.id === id);
-    const t = String(text ?? '').replace(/\s+/g, ' ').trim();
-    if (!g || t.length < 8) return null;
-    g.history.push({ ts: now, event: 'text-changed', by: 'user', note: truncate(g.text, 200) });
-    g.text = truncate(t, 200);
+    if (!g) return null;
+    const p = typeof patch === 'string' ? { text: patch } : (patch || {});
+    const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const text = p.text !== undefined ? clean(p.text) : g.text;
+    const criteria = p.criteria !== undefined ? clean(p.criteria) : g.criteria;
+    if (text.length < 8 || criteria.length < 5) return null;
+    if (text !== g.text) g.history.push({ ts: now, event: 'text-changed', by: 'user', note: truncate(g.text, 200) });
+    g.text = truncate(text, 200);
+    g.criteria = truncate(criteria, 240);
+    if (p.reason !== undefined) g.reason = truncate(clean(p.reason), 240);
+    if (p.priority != null) g.priority = Math.round(clamp(p.priority, 1, 5));
     g.locked = true;
     g.updatedAt = now;
     data.updatedAt = now;

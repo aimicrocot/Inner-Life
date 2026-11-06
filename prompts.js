@@ -42,7 +42,7 @@ function diaryLines(entries) {
 
 function goalLines(goals) {
     if (!goals?.length) return '(none: having no goals is a perfectly normal state)';
-    return goals.map(g => `- [${g.id}] (${g.kind}${g.parentId ? ` of ${g.parentId}` : ''}, priority ${g.priority}, ${g.status}) ${g.text} | done when: ${g.criteria}${g.progress ? ` | progress: ${g.progress}` : ''}`).join('\n');
+    return goals.map(g => `- [${g.id}] (${g.kind}${g.parentId ? ` of ${g.parentId}` : ''}, priority ${g.priority}, ${g.status}) ${g.text} | done when: ${g.criteria}${g.progress ? ` | progress: ${g.progress}` : ''}${g.createdBy === 'user' ? ' | suggested by the user (the character may adopt it, pursue it or finish it in their own way)' : ''}`).join('\n');
 }
 
 function closedGoalLines(goals) {

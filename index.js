@@ -1,5 +1,6 @@
 // Inner Life: diary, memory and a heartbeat for SillyTavern characters.
 // Entry point: wires settings, engine, events, prompt injection and UI together.
+import { createFab } from './fab.js';
 import { HeartbeatEngine } from './heartbeat.js';
 import { currentCharacter, ctx, getSnapshot, insertCharacterMessage, markGenerating, toast } from './host.js';
 import { clearInjection, computeInjection, installInterceptor } from './injector.js';
@@ -48,10 +49,15 @@ jQuery(async () => {
         const html = await $.get(`${BASE_URL}settings.html`);
         $('#extensions_settings2').append(html);
 
+        const fab = createFab({ getSettings, saveSettings, onOpen: () => openPanel(app) });
+
         async function updateDrawer() {
             const s = getSettings();
             const cur = currentCharacter();
             $('#il_master').prop('checked', s.enabled);
+            $('#il_fab').prop('checked', !!s.ui.floatingButton);
+            fab.setVisible(!!s.ui.floatingButton);
+            fab.applyPosition();
             const charBox = $('#il_char');
             if (cur) {
                 charBox.prop('disabled', false).prop('checked', getCharSettings(s, cur.avatar).enabled);
@@ -61,6 +67,8 @@ jQuery(async () => {
                 $('#il_char_label').text('Включить для текущего персонажа (откройте чат с одним персонажем)');
             }
             const st = engine.getStatus();
+            const charOn = !!cur && getCharSettings(s, cur.avatar).enabled;
+            fab.setState(!s.enabled || !charOn ? 'off' : st.running ? 'busy' : (st.paused || st.lastError) ? 'warn' : 'on');
             let text;
             if (st.running) text = 'Идёт внутренний цикл…';
             else if (st.paused) text = 'Фон приостановлен (см. панель).';
@@ -94,6 +102,11 @@ jQuery(async () => {
             updateDrawer();
         });
         $('#il_open').on('click', () => openPanel(app));
+        $('#il_fab').on('input', (e) => {
+            getSettings().ui.floatingButton = Boolean($(e.target).prop('checked'));
+            saveSettings();
+            updateDrawer();
+        });
 
         // ----- chat/generation lifecycle -----
         async function ensureLoaded() {
