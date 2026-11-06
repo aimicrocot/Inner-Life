@@ -48,6 +48,8 @@ export const DEFAULT_SETTINGS = {
     },
     ui: {
         notify: true, // short toasts when the character writes, remembers or sets a goal
+        floatingButton: true, // round heart button that opens the panel from anywhere
+        fabPos: null, // { x, y } once the user has dragged it
     },
     initiative: {
         mode: 'off', // 'off' | 'rare' | 'moderate' | 'custom'
@@ -151,6 +153,8 @@ export function sanitizeSettings(s) {
     g.maxNewPerDay = clamp(g.maxNewPerDay, 0, 20);
     g.staleDays = clamp(g.staleDays, 1, 365);
     if (!['full', 'summary', 'hidden'].includes(g.visibility)) g.visibility = 'full';
+    const fp = s.ui.fabPos;
+    s.ui.fabPos = fp && Number.isFinite(fp.x) && Number.isFinite(fp.y) ? { x: fp.x, y: fp.y } : null;
     s.awareness.gapMinHours = clamp(s.awareness.gapMinHours, 1, 720);
     s.unsaid.maxHeld = Math.round(clamp(s.unsaid.maxHeld, 1, 20));
     s.unsaid.expireDays = clamp(s.unsaid.expireDays, 1, 365);
