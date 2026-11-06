@@ -7,6 +7,6 @@
   "css": "style.css",
   "generate_interceptor": "innerLifeInterceptor",
   "author": "Your Name",
-  "version": "0.6.0",
+  "version": "0.5.1",
   "homePage": "https://github.com/username/inner-life"
 }
